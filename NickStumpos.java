@@ -61,8 +61,8 @@ public class NickStumpos extends AdvancedRobot {
 			yForce +=  computeYforce(e.getLoc(), findEnemyWeight(e)) ;
 		}
 		Point2D randomGravityWell = new Point2D.Double(getRandomX(),getRandomY());	
-		xForce -=  computeXforce(randomGravityWell, (Math.random()%WALL_WEIGHT+1));
-		yForce -=  computeXforce(randomGravityWell, (Math.random()%WALL_WEIGHT+1));
+		xForce +=  computeXforce(randomGravityWell, (Math.random()));
+		yForce +=  computeXforce(randomGravityWell, (Math.random()));
 		double theta = Math.atan2(xForce, yForce);
 		return theta;
 	}
@@ -100,17 +100,20 @@ public class NickStumpos extends AdvancedRobot {
 			setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
 			doMove();
 			if(Math.abs(getGunTurnRemaining()) < 10 && targetEnemy!=null && getEnergy() > 1) {
-				double firePower = Math.min(500 / me.distance(targetEnemy.loc), 3);
+				double firePower = Math.min(Math.min(getEnergy()/6d, 1300d/me.distance(targetEnemy.loc)), targetEnemy.energy/3d);
 				double bulletSpeed = 20 - firePower * 3;
 				long time = (long)(me.distance(targetEnemy.getLoc()) / bulletSpeed);
-				setFire( Math.min(Math.min(getEnergy()/6d, 1300d/me.distance(targetEnemy.loc)), targetEnemy.energy/3d) );
+				setFire( firePower );
 				setTurnGunRightRadians(Utils.normalRelativeAngle(computeAbsoluteAngle(
-						new Point2D.Double(targetEnemy.getLoc().getX()+Math.sin(Math.toRadians(targetEnemy.getHeading())) * targetEnemy.getVelocity() * time,
-								targetEnemy.getLoc().getY()+Math.cos(Math.toRadians(targetEnemy.getHeading())) * targetEnemy.getVelocity() * time), me) - getGunHeadingRadians()));
+						guestimateEnemyLocation(time), me) - getGunHeadingRadians()));
 			}
 			
 			execute();
 		} while (true);
+	}
+	private java.awt.geom.Point2D.Double guestimateEnemyLocation(long time) {
+		return new Point2D.Double(targetEnemy.getLoc().getX()+Math.sin(Math.toRadians(targetEnemy.getHeading())) * targetEnemy.getVelocity() * time,
+				targetEnemy.getLoc().getY()+Math.cos(Math.toRadians(targetEnemy.getHeading())) * targetEnemy.getVelocity() * time);
 	}
 
 	
@@ -122,10 +125,10 @@ public class NickStumpos extends AdvancedRobot {
 		double absBearing = e.getBearingRadians() + getHeadingRadians();
 		if (!enemies.containsKey(e.getName())) {
 			enemies.put(e.getName(),
-					new Enemy( e.getEnergy(),  e.getHeading(), new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
+					new Enemy( e.getEnergy(),  e.getHeadingRadians(), new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
 									getY() + e.getDistance() * Math.cos(absBearing)),e.getVelocity()));
 		} else {
-			enemies.get(e.getName()).updateStats(e.getEnergy(),  e.getHeading(), new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
+			enemies.get(e.getName()).updateStats(e.getEnergy(),  e.getHeadingRadians(), new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
 					getY() + e.getDistance() * Math.cos(absBearing)),e.getVelocity());
 		}
 		if (targetEnemy == null) {
