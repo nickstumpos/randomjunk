@@ -41,13 +41,21 @@ public class NickStumpos extends AdvancedRobot {
 
 	private void doMove() {
 		double theta = findTheta();
-		double relativeHeading = Utils.normalRelativeAngle(theta - getHeadingRadians());
-		if (!Utils.isNear(0, relativeHeading)) {
-			setTurnRightRadians(shortestTurn(relativeHeading));
+		lastAngle=theta;
+		double relativeHeading = theta - getHeadingRadians();
+		if (Utils.isNear(0, relativeHeading)) {
+			if(Math.abs(relativeHeading)<Math.PI/2){
+				setAhead(Double.POSITIVE_INFINITY);
+			}else{
+				setAhead(Double.NEGATIVE_INFINITY);
+			}
+		}else if(Math.abs(relativeHeading)<Math.PI/2){
+		    setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading));
+		    setAhead(Double.POSITIVE_INFINITY);
+		} else {
+		    setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading+Math.PI-getHeadingRadians()));
+		    setAhead(Double.NEGATIVE_INFINITY);
 		}
-			
-		
-		setAhead(Double.POSITIVE_INFINITY);
 	}
 
 	private double findTheta() {
@@ -77,7 +85,14 @@ public class NickStumpos extends AdvancedRobot {
 	private double getRandomX() {
 		return random.nextInt() % getBattleFieldWidth()/2;
 	}
-
+		private double lastAngle;
+ public void onPaint(Graphics2D g) {
+	     // Set the paint color to a red half transparent color
+	     g.setColor(Color.RED);
+	 
+	     g.drawLine((int)getX(),(int)getY(), (int)(500 * Math.cos(lastAngle)), (int)(500* Math.sin(lastAngle)));
+	    
+	 }
 	private double findEnemyWeight(Enemy e) {
 		return ENEMY_WEIGHT * e.getEnergy() / getEnergy();
 	}
