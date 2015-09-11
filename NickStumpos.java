@@ -4,22 +4,25 @@ import robocode.*;
 import robocode.util.Utils;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-import javax.tools.JavaCompiler;
 
 // API help : http://robocode.sourceforge.net/docs/robocode/robocode/Robot.html
 /**
  * NickStumpos - a robot by (your name here)
  */
 public class NickStumpos extends AdvancedRobot {
-	private static double WALL_WEIGHT = 10000;
+	private static double WALL_WEIGHT = 1000;
 	private static double ENEMY_WEIGHT = 200;
 	private static double MAX_NO_SPIN = 100;
+	private static double MAX_RAND_TICKS = 50;
+	private static double MAX_CHG_GRAV = 5;
 	private Random random = new Random();
+
 	private double computeAbsoluteAngle(Point2D a, Point2D b) {
 		return Utils.normalAbsoluteAngle(Math.atan2(a.getX() - b.getX(), a.getY() - b.getY()));
 	}
@@ -38,23 +41,28 @@ public class NickStumpos extends AdvancedRobot {
 
 	private Enemy targetEnemy;
 	private int spincount = 0;
-
+	private int moveCount=0;
 	private void doMove() {
-		double theta = findTheta();
-		lastAngle=theta;
-		double relativeHeading = theta - getHeadingRadians();
+		if (moveCount>MAX_CHG_GRAV) {
+			moveCount=0;
+			double theta = findTheta();
+			lastAngle = theta;
+		}else{
+			moveCount++;
+		}
+		double relativeHeading = lastAngle - getHeadingRadians();
 		if (Utils.isNear(0, relativeHeading)) {
-			if(Math.abs(relativeHeading)<Math.PI/2){
+			if (Math.abs(relativeHeading) < Math.PI / 2) {
 				setAhead(Double.POSITIVE_INFINITY);
-			}else{
+			} else {
 				setAhead(Double.NEGATIVE_INFINITY);
 			}
-		}else if(Math.abs(relativeHeading)<Math.PI/2){
-		    setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading));
-		    setAhead(Double.POSITIVE_INFINITY);
+		} else if (Math.abs(relativeHeading) < Math.PI / 2) {
+			setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading));
+			setAhead(Double.POSITIVE_INFINITY);
 		} else {
-		    setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading+Math.PI-getHeadingRadians()));
-		    setAhead(Double.NEGATIVE_INFINITY);
+			setTurnRightRadians(Utils.normalRelativeAngle(relativeHeading + Math.PI - getHeadingRadians()));
+			setAhead(Double.NEGATIVE_INFINITY);
 		}
 	}
 
@@ -69,34 +77,45 @@ public class NickStumpos extends AdvancedRobot {
 			xForce += computeXforce(e.getLoc(), findEnemyWeight(e), 2);
 			yForce += computeYforce(e.getLoc(), findEnemyWeight(e), 2);
 		}
-			Point2D randomGravityWell = new Point2D.Double(getRandomX(), getRandomY());
+		if(randomGravityWell==null || randomGravityWellCount<MAX_RAND_TICKS){
+		 randomGravityWell = new Point2D.Double(getRandomX(), getRandomY());
+		 randomGravityWellCount=0;
+		}else{
+			randomGravityWellCount++;
+		}
 
-			xForce += computeXforce(randomGravityWell, (random.nextInt() % 10), 2);
-			yForce += computeYforce(randomGravityWell, (random.nextInt() % 10), 2);
-		
+		xForce += computeXforce(randomGravityWell, (random.nextInt() % 10), 2);
+		yForce += computeYforce(randomGravityWell, (random.nextInt() % 10), 2);
+
 		double theta = Math.atan2(xForce, yForce);
+		if(theta<0)theta=theta+2*Math.PI;
 		return theta;
 	}
 
 	private double getRandomY() {
-		return random.nextInt() % getBattleFieldHeight()/2;
+		return random.nextInt() % getBattleFieldHeight() / 2;
 	}
 
 	private double getRandomX() {
-		return random.nextInt() % getBattleFieldWidth()/2;
+		return random.nextInt() % getBattleFieldWidth() / 2;
 	}
-		private double lastAngle;
- public void onPaint(Graphics2D g) {
-	     // Set the paint color to a red half transparent color
-	     g.setColor(Color.RED);
-	 
-	     g.drawLine((int)getX(),(int)getY(), (int)(500 * Math.cos(lastAngle)), (int)(500* Math.sin(lastAngle)));
-	    
-	 }
+
+	private double lastAngle;
+
+	public void onPaint(Graphics2D g) {
+		// Set the paint color to a red half transparent color
+		g.setColor(Color.RED);
+		g.fillRect((int)randomGravityWell.getX(), (int)randomGravityWell.getY(), 10, 10);
+		g.fillRect((int)targetEnemy.getLoc().getX(), (int)targetEnemy.getLoc().getY(), 50, 50);
+		g.drawLine((int) getX(), (int) getY(), (int) (500 * Math.cos(lastAngle)), (int) (500 * Math.sin(lastAngle)));
+
+	}
+
 	private double findEnemyWeight(Enemy e) {
 		return ENEMY_WEIGHT * e.getEnergy() / getEnergy();
 	}
-
+	private Point2D randomGravityWell=null;
+	private int randomGravityWellCount=0;
 	double shortestTurn(double angle) {
 		if (angle > Math.PI) {
 			angle -= 2 * Math.PI;
@@ -114,7 +133,7 @@ public class NickStumpos extends AdvancedRobot {
 		setAdjustRadarForGunTurn(true);
 		setAdjustGunForRobotTurn(true);
 		while (true) {
-			
+
 			setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
 			execute();
 		}
@@ -128,12 +147,12 @@ public class NickStumpos extends AdvancedRobot {
 		if (!enemies.containsKey(e.getName())) {
 			enemies.put(e.getName(),
 					new Enemy(e.getEnergy(), e.getHeadingRadians(),
-							new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
+							new Point2D.Double(getX()+e.getDistance() * Math.sin(absBearing),
 									getY() + e.getDistance() * Math.cos(absBearing)),
 							e.getVelocity(), e.getTime(), e.getBearingRadians()));
 		} else {
 			enemies.get(e.getName()).updateStats(e.getEnergy(), e.getHeadingRadians(),
-					new Point2D.Double(+e.getDistance() * Math.sin(absBearing),
+					new Point2D.Double(getX()+e.getDistance() * Math.sin(absBearing),
 							getY() + e.getDistance() * Math.cos(absBearing)),
 					e.getVelocity(), e.getTime(), e.getBearingRadians());
 		}
@@ -142,36 +161,41 @@ public class NickStumpos extends AdvancedRobot {
 		} else if (threatLevel(enemies.get(e.getName())) > threatLevel(targetEnemy)) {
 			targetEnemy = enemies.get(e.getName());
 		}
-		if (getOthers()<=enemies.keySet().size()) {
 			me = new Point2D.Double(getX(), getY());
 			doMove();
 			engageEnemy();
-		}
+		
 		execute();
 	}
 
 	private void engageEnemy() {
-		setFire(Math.min(600 / me.distance(targetEnemy.getLoc()), 3));
-		setTurnGunRightRadians(
-				shortestTurn(Utils.normalRelativeAngle(targetEnemy.getBearing() + getHeadingRadians() - getGunHeadingRadians())));
-
-		if (spincount < MAX_NO_SPIN) {
-			spincount++;
-			setTurnRadarRightRadians(
-					shortestTurn(Utils.normalRelativeAngle(targetEnemy.getBearing() + getHeadingRadians() - getRadarHeadingRadians())
-							* 2));
-		} else {
-			spincount = 0;
-			turnRadarRightRadians(2 * Math.PI);
-		}
-	}
-	  public void onWin(WinEvent e) {
-		  stop();
-			for (int i = 0; i < 50; i++) {
-				turnRightRadians(Math.PI/4);
-				turnLeftRadians(Math.PI/4);
+		if (targetEnemy!=null) {
+			double fire =Math.min(1600 / me.distance(targetEnemy.getLoc()), 3);
+			System.out.println(fire);
+			setFire(fire);
+			setTurnGunRightRadians(shortestTurn(Utils.normalRelativeAngle(
+					targetEnemy.getBearing() + getHeadingRadians() - getGunHeadingRadians())));
+		
+			if (spincount < MAX_NO_SPIN) {
+				spincount++;
+				setTurnRadarRightRadians(shortestTurn(
+						Utils.normalRelativeAngle(targetEnemy.getBearing() + getHeadingRadians() - getRadarHeadingRadians())
+								* 2));
+			} else {
+				spincount = 0;
+				turnRadarRightRadians(2 * Math.PI);
 			}
 		}
+	}
+
+	public void onWin(WinEvent e) {
+		stop();
+		for (int i = 0; i < 50; i++) {
+			turnRightRadians(Math.PI / 4);
+			turnLeftRadians(Math.PI / 4);
+		}
+	}
+
 	@Override
 	public void onHitRobot(HitRobotEvent e) {
 		targetEnemy = enemies.get(e.getName());
@@ -186,16 +210,15 @@ public class NickStumpos extends AdvancedRobot {
 
 	@Override
 	public void onHitByBullet(HitByBulletEvent e) {
-		if (e.getBearing() > -90 && e.getBearing() <= 90) {
-			back(100);
-		} else {
-			ahead(100);
-		}
+		
 	}
+
 	private double threatLevel(Enemy e) {
-		return (e.getEnergy() / getEnergy()) / e.getLoc().distanceSq(me);
-	}
+	//	return (e.getEnergy() / getEnergy()) / e.getLoc().distanceSq(me);
+		return  e.getLoc().distance(me);
 	
+	}
+
 	@Override
 	public void onRobotDeath(RobotDeathEvent e) {
 		enemies.remove(e.getName());
