@@ -36,28 +36,23 @@ public class NickStumpos extends AdvancedRobot {
 	boolean hit = false;
 	int moving = 0;
 	private static Random rand = new Random();
-	private Ellipse2D maxCircle;
 	private Rectangle reducedBattleField;
-	private Ellipse2D minCircle;
 	private double hypot;
 	private Line2D crow;
 	private Rectangle battleField;
 
 	private Point2D.Double getNext() {
 		Point2D.Double point = new Point2D.Double(getX(), getY());
-		maxCircle = new Ellipse2D.Double( me.x - maxRad, me.y - maxRad, maxRad*2, maxRad*2);
-		minCircle = new Ellipse2D.Double( me.x - minRad, me.y - minRad, minRad*2, minRad*2);
-		pointsTried.clear();
 		int i;
 		double minForce = Double.POSITIVE_INFINITY;
-		for (i = 0; i < 300; i++) {
-			Point2D.Double randPoint = new Point2D.Double(maxCircle.getMinX()
-					+ Math.abs(rand.nextInt() % maxCircle.getWidth()), maxCircle.getMinY()
-					+ Math.abs(rand.nextInt() % maxCircle.getHeight()));
+		for (i = 0; i < 100; i++) {
+
+			double t = 2*Math.PI*Math.random();
+			double	u = Math.random()+Math.random();
+			double	r = u>1?  2-u : u;
+			Point2D.Double randPoint = new Point2D.Double(me.x + maxRad*r*Math.sin(t), me.y + maxRad*r*Math.cos(t));
 			
-			
-			
-			if (reducedBattleField.contains(randPoint) && maxCircle.contains(randPoint) && !minCircle.contains(randPoint)) {
+			if (reducedBattleField.contains(randPoint)  && me.distance(randPoint)>minRad) {
 				double force = 0;
 
 				for (Enemy e : this.enemies.values()) {
@@ -65,7 +60,7 @@ public class NickStumpos extends AdvancedRobot {
 					force += Math.abs(100*e.getEnergy()
 							/ (randPoint.distanceSq(e.guestimatedLocationOfImpact(me.distance(randPoint)/8, getTime()))));
 				}
-				pointsTried.put(randPoint,force);
+				pointsTried.put(randPoint, force);
 				if (force < minForce) {
 					minForce=force;
 					System.out.println(minForce);
@@ -230,12 +225,7 @@ public class NickStumpos extends AdvancedRobot {
 			g.fillRect((int) targetEnemy.getLocation().x - 10,
 					(int) targetEnemy.getLocation().y - 10, 20, 20);
 		}
-		if(maxCircle!=null){
-			g.draw(maxCircle);
-		}
-		if(minCircle!=null){
-			g.draw(minCircle);
-		}
+		
 		if(reducedBattleField!=null){
 			g.draw(reducedBattleField);
 		}
