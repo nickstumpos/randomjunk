@@ -1,20 +1,13 @@
 package Buckingham.Team3;
 
 import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Ellipse2D;
-import java.awt.geom.Line2D;
-import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
 
 import robocode.AdvancedRobot;
-import robocode.BulletMissedEvent;
 import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
 import robocode.WinEvent;
@@ -26,53 +19,19 @@ public class NickStumpos extends AdvancedRobot {
 	private static final int MIN_MAX_RAD = 150;
 	private static final int MAX_MOVE = 100;
 	private static int STICK = 25;
-	private double minRad = 100;
-	private double maxRad = 300;
 	private Map<String, Enemy> enemies = new HashMap<String, NickStumpos.Enemy>();
-	private Map<Point2D, Double> pointsTried = new HashMap<Point2D, Double>();
+	//private Map<Point2D, Double> pointsTried = new HashMap<Point2D, Double>();
 	private Enemy targetEnemy;
 	private Point2D.Double next;
 	private Point2D.Double me;
 	boolean hit = false;
 	int moving = 0;
-	private static Random rand = new Random();
 	private Rectangle reducedBattleField;
 	private double hypot;
-	private Line2D crow;
+	//private Line2D crow;
 	private Rectangle battleField;
 
-	private Point2D.Double getNext() {
-		Point2D.Double point = new Point2D.Double(getX(), getY());
-		int i;
-		double minForce = Double.POSITIVE_INFINITY;
-		for (i = 0; i < 100; i++) {
-
-			double t = 2*Math.PI*Math.random();
-			double	u = Math.random()+Math.random();
-			double	r = u>1?  2-u : u;
-			Point2D.Double randPoint = new Point2D.Double(me.x + maxRad*r*Math.sin(t), me.y + maxRad*r*Math.cos(t));
-			
-			if (reducedBattleField.contains(randPoint)  && me.distance(randPoint)>minRad) {
-				double force = 0;
-
-				for (Enemy e : this.enemies.values()) {
-					
-					force += Math.abs(100*e.getEnergy()
-							/ (randPoint.distanceSq(e.guestimatedLocationOfImpact(me.distance(randPoint)/8, getTime()))));
-				}
-				pointsTried.put(randPoint, force);
-				if (force < minForce) {
-					minForce=force;
-					System.out.println(minForce);
-					point = randPoint;
-					crow = new Line2D.Double(me, randPoint);
-				}
-			}
-		}
-		System.out.println(i);
-		
-		return point;
-	}
+	
 
 	public void run() {
 		
@@ -81,14 +40,12 @@ public class NickStumpos extends AdvancedRobot {
 		setAdjustRadarForGunTurn(true);
 		setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
 		battleField = new Rectangle(0, 0, (int)getBattleFieldWidth(), (int)getBattleFieldHeight());
-		reducedBattleField = new Rectangle((int)STICK, STICK, (int)getBattleFieldWidth()-STICK*2, (int)getBattleFieldHeight()-STICK*2);
+		reducedBattleField = new Rectangle(battleField);
+		reducedBattleField.grow(-STICK, -STICK);
 		hypot=Math.sqrt(getBattleFieldHeight()*getBattleFieldHeight()+getBattleFieldWidth()*getBattleFieldWidth());
 		me = new Point2D.Double(getX(), getY());
 		next = me;
-		do {
-			maxRad=Math.max(MAX_RAD/getOthers(),MIN_MAX_RAD);
-			minRad=Math.max(maxRad/3,MIN_MIN_RAD);
-			
+		do {		
 			me = new Point2D.Double(getX(), getY());
 			setupNext();
 			engageEnemy();
@@ -100,8 +57,44 @@ public class NickStumpos extends AdvancedRobot {
 
 	private void setupNext() {
 		if (moving >= MAX_MOVE || me.distance(next) <= STICK) {
-			next = getNext();
-			moving = 0;
+			int i=100;
+			double minForce = Double.POSITIVE_INFINITY;
+			try {
+				while(true){
+					double maxRadius=Math.max(MAX_RAD/getOthers(),MIN_MAX_RAD);
+					double randAngle=2*Math.PI*Math.random();
+					double randPercentOfRad= Math.max(maxRadius/3,MIN_MIN_RAD)/maxRadius+Math.random()/2;					
+					Point2D.Double randPoint = new Point2D.Double(me.x + maxRadius*randPercentOfRad*Math.sin(randAngle), me.y + maxRadius*randPercentOfRad*Math.cos(randAngle));					
+					if (reducedBattleField.contains(randPoint)) {
+						double force = 0/i--;
+						Iterator<Enemy> eIter = this.enemies.values().iterator();
+						try {
+							while (true) {
+								Enemy e = eIter.next();
+								force += Math
+										.abs(100
+												* e.energy
+												/ (randPoint.distanceSq(e
+														.guestimatedLocationOfImpact(
+																me.distance(randPoint) / 8,
+																getTime()))));
+							}
+						} catch (Exception e) {
+							//pointsTried.put(randPoint, force);
+							if (force < minForce) {
+								minForce=force;
+								next = randPoint;
+								//crow = new Line2D.Double(me, randPoint);
+							}
+						}
+						
+						
+					}
+				}
+			} catch (ArithmeticException e) {
+				moving = 0;
+			}
+			
 		}
 	}
 
@@ -114,47 +107,33 @@ public class NickStumpos extends AdvancedRobot {
 	}
 
 	private double getTurnToNext() {
-		return getTurnToPoint(next);
-	}
-
-	private double getTurnToPoint(Point2D.Double point){
-		return shortestTurn(Utils.normalRelativeAngle(angleFromXwithMeAsOrigin(point) - getHeadingRadians()));
+		return shortestTurn(Utils.normalRelativeAngle(angleFromXwithMeAsOrigin(next) - getHeadingRadians()));
 	}
 
 	double getNextV(double turnRadians) {
-		double ret = 0;
-		if (Utils.isNear(0, turnRadians)) {
-			ret = 8;
-		} else {
-			ret = Math
-					.min((int) Math.floor(Math.abs(Math.PI / turnRadians)), 8);
+		try{
+			return Math.min((int) Math.floor(Math.abs(Math.PI / turnRadians)), 8);
+		}catch(Exception e ){
+			return 8;
 		}
-		return ret;
 	}
 
 	public void onScannedRobot(ScannedRobotEvent e) {
-		if (!enemies.containsKey(e.getName())) {
+		Enemy scannedEnemy = enemies.get(e.getName());
+		if(scannedEnemy==null){
 			enemies.put(
 					e.getName(),
-					new Enemy(
-							e.getEnergy(),
-							e.getHeadingRadians(),
-							pointAtAngleFromMe(e.getDistance(),
-									getHeadingRadians() + e.getBearingRadians()),
-							e.getVelocity(), e.getTime(), e.getBearingRadians()));
-		} else {
-			enemies.get(e.getName()).updateStats(
-					e.getEnergy(),
-					e.getHeadingRadians(),
-					pointAtAngleFromMe(e.getDistance(),
-							getHeadingRadians() + e.getBearingRadians()),
-					e.getVelocity(), e.getTime(), e.getBearingRadians());
+					scannedEnemy=new Enemy());
 		}
+		scannedEnemy.updateStats(
+					pointAtAngleFromMe(e.getDistance(),
+							getHeadingRadians() + e.getBearingRadians()),e);
+		
 		if (targetEnemy == null
-				|| threatLevel(enemies.get(e.getName())) > threatLevel(targetEnemy)) {
-			targetEnemy = enemies.get(e.getName());
+				|| threatLevel(scannedEnemy) > threatLevel(targetEnemy)) {
+			targetEnemy = scannedEnemy;
 			setTurnGunRightRadians(shortestTurn(Utils
-					.normalRelativeAngle(targetEnemy.getBearing()
+					.normalRelativeAngle(targetEnemy.bearing
 							+ getHeadingRadians() - getGunHeadingRadians())));
 		}
 		if(getOthers()==1){
@@ -167,11 +146,11 @@ public class NickStumpos extends AdvancedRobot {
 			if (getEnergy() > 1) {
 				double power = Math.min(
 						Math.min(
-								Math.min(getEnergy()/10,hypot / me.distance(targetEnemy.getLocation())
+								Math.min(getEnergy()/10,hypot / me.distance(targetEnemy.location)
 								),
 							targetEnemy.energy / 4
 							),3);
-				if (aimGun(power) && Utils.isNear(0, getGunHeat())						
+				if (aimGun(power) && 0== getGunHeat()						
 						&& Math.abs(getGunTurnRemainingRadians())<Math.PI/16) {
 					setFire(power);
 				}
@@ -188,7 +167,7 @@ public class NickStumpos extends AdvancedRobot {
 		}
 	}
 	private boolean aimGun(double power) {
-		double distance = me.distance(targetEnemy.getLocation());
+		double distance = me.distance(targetEnemy.location);
 		double speed=(20 - power * 3);
 		long time = (long) Math.ceil(distance/speed);
 		Point2D.Double locationGuess=targetEnemy.guestimatedLocationOfImpact(time,getTime());
@@ -202,8 +181,8 @@ public class NickStumpos extends AdvancedRobot {
 	}
 
 	private double threatLevel(Enemy e) {
-		return e.getEnergy()
-				/ e.getLocation().distanceSq(me);
+		return e.energy
+				/ e.location.distanceSq(me);
 	}
 
 	public void onRobotDeath(RobotDeathEvent e) {
@@ -217,32 +196,35 @@ public class NickStumpos extends AdvancedRobot {
 				* Math.cos(ang));
 	}
 
-	@Override
-	public void onPaint(Graphics2D g) {
-		g.setColor(Color.RED);
+//	@Override
+//	public void onPaint(Graphics2D g) {
+//		g.setColor(Color.RED);
 	//	g.fillRect((int) next.x - 10, (int) next.y - 10, 20, 20);
-		if (targetEnemy != null) {
-			g.fillRect((int) targetEnemy.getLocation().x - 10,
-					(int) targetEnemy.getLocation().y - 10, 20, 20);
-		}
+//		if (targetEnemy != null) {
+//			g.fillRect((int) targetEnemy.getLocation().x - 10,
+//					(int) targetEnemy.getLocation().y - 10, 20, 20);
+//		}
+//		
+//		if(reducedBattleField!=null){
+//			g.draw(reducedBattleField);
+//		}if(battleField!=null){
+//			g.draw(battleField);
+//		}
+//		if(crow!=null){
+//			g.draw(crow);
+//		}
 		
-		if(reducedBattleField!=null){
-			g.draw(reducedBattleField);
-		}
-		if(crow!=null){
-			g.draw(crow);
-		}
-		
-		for(Entry<Point2D, Double> p : pointsTried.entrySet()){
-			if (p.getValue()<50) {
-				g.fillRect((int) (p.getKey().getX() - p.getValue()), (int) (p
-						.getKey().getY() - p.getValue()),
-						(int) (p.getValue() * 2), (int) (p.getValue() * 2));
-			}
-		}
-		super.onPaint(g);
-	}
-	
+//		for(Entry<Point2D, Double> p : pointsTried.entrySet()){
+//			if (p.getValue()<50) {
+//				g.fillRect((int) (p.getKey().getX() - p.getValue()), (int) (p
+//						.getKey().getY() - p.getValue()),
+//						(int) (p.getValue() * 2), (int) (p.getValue() * 2));
+//			}
+//		}
+//		pointsTried.clear();
+//		super.onPaint(g);
+//	}
+//	
 	private double angleFromXwithMeAsOrigin(Point2D.Double p) {
 		return Math.atan2(p.x - me.x, p.y - me.y);
 	}
@@ -257,61 +239,24 @@ public class NickStumpos extends AdvancedRobot {
 	}
 
 	private static class Enemy {
-		private Point2D.Double loc;
-		private double energy;
+		public Point2D.Double location;
+		public double energy;
 		private double velocity;
 		private double heading;
-		private double bearing;
+		public double bearing;
 		private long time;
-
-		Enemy(double energy, double heading, Point2D.Double pos,
-				double velocity, long time, double bearing) {
-			this.energy = energy;
-			this.heading = heading;
-			this.loc = pos;
-			this.velocity = velocity;
-			this.time = time;
-			this.bearing = bearing;
-			
+		public void updateStats(
+				Point2D.Double pos, ScannedRobotEvent e) {
+			this.energy = e.getEnergy();
+			this.heading = e.getHeadingRadians();
+			this.location = pos;
+			this.velocity = e.getVelocity();
+			this.time = e.getTime();
+			this.bearing = e.getBearingRadians();
 		}
-
-		public void updateStats(double energy, double heading,
-				Point2D.Double pos, Double velocity, long time, double bearing) {
-			this.energy = energy;
-			this.heading = heading;
-			this.loc = pos;
-			this.velocity = velocity;
-			this.time = time;
-			this.bearing = bearing;
-		}
-
-		public Point2D.Double getLocation() {
-			return loc;
-		}
-
-		public Double getVelocity() {
-			return velocity;
-		}
-
-		public Double getEnergy() {
-			return energy;
-		}
-
-		public Double getHeading() {
-			return heading;
-		}
-
-		public long getTime() {
-			return time;
-		}
-
-		public Double getBearing() {
-			return bearing;
-		}
-
 		public Point2D.Double guestimatedLocationOfImpact(double deltaT,double currentTime){
 			deltaT=currentTime-time+deltaT;
-			return new Point2D.Double(loc.x + Math.sin(heading) * velocity *deltaT,loc.y + Math.cos(heading) * velocity * deltaT);
+			return new Point2D.Double(location.x + Math.sin(heading) * velocity *deltaT,location.y + Math.cos(heading) * velocity * deltaT);
 		}
 		
 	}
