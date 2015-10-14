@@ -2,10 +2,13 @@ package Buckingham.Team3;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import robocode.AdvancedRobot;
 import robocode.RobotDeathEvent;
@@ -15,7 +18,7 @@ import robocode.util.Utils;
 /***********
  * Robot that uses some random anti gravity and basic predictive targeting
  * trying to keep it under 1500 bytes. eventually lower after i see where i can simplify
- * @author o254802
+ * @author Nick Stumpos
  *
  */
 public class NickStumpos extends AdvancedRobot {
@@ -23,14 +26,14 @@ public class NickStumpos extends AdvancedRobot {
 	private static final int MIN_MIN_RAD = 50;
 	private static final int MIN_MAX_RAD = 150;
 	private static final int MAX_MOVE = 100;
-	private static int STICK = 25;
+	private static int STICK = 36;
 	private Map<String, Enemy> enemies = new HashMap<String, NickStumpos.Enemy>();
 	// private Map<Point2D, Double> pointsTried = new HashMap<Point2D,
 	// Double>();
 	private Enemy targetEnemy;
 	private Point2D.Double next;
 	private Point2D.Double me;
-	boolean hit = false;
+	//boolean hit = false;
 	int moving = 0;
 	private Rectangle reducedBattleField;
 	private double hypot;
@@ -39,7 +42,7 @@ public class NickStumpos extends AdvancedRobot {
 
 	public void run() {
 
-		setColors(new Color(24, 69, 59), Color.WHITE, new Color(24, 69, 59)); // #GOGREEN
+		setColors(new Color(24, 69, 59),  new Color(153, 162, 162), new Color(24, 69, 59)); // #GOGREEN
 		setAdjustGunForRobotTurn(true);
 		setAdjustRadarForGunTurn(true);
 		setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
@@ -84,18 +87,19 @@ public class NickStumpos extends AdvancedRobot {
 						Iterator<Enemy> eIter = this.enemies.values()
 								.iterator();
 						try {
+							Enemy e;
 							//stay away from threats
-							while (true) {
-								Enemy e = eIter.next();
+							while (true) {				
 								force += Math
 										.abs(100
-												* e.e.getEnergy()
-												/ (randPoint.distanceSq(e
+												* (e = eIter.next()).e.getEnergy()
+												/ (randPoint.distanceSq(
+														e
 														.guestimatedLocationOfImpact(
 																me.distance(randPoint) / 8,
 																getTime()))));
 							}
-						} catch (Exception e) {
+						} catch (NoSuchElementException e) {
 							//went through all enemies. this way is less bytes to stay under 1500
 							// pointsTried.put(randPoint, force);
 							if (force < minForce) {
@@ -159,8 +163,7 @@ public class NickStumpos extends AdvancedRobot {
 	}
 
 	private void engageEnemy() {
-		if (targetEnemy != null) {
-			if (getEnergy() > 1) {
+			if (targetEnemy != null && getEnergy() > 1) {
 				double power = Math.min(Math.min(
 						Math.min(getEnergy() / 10,
 								hypot / me.distance(targetEnemy.location)),
@@ -173,7 +176,6 @@ public class NickStumpos extends AdvancedRobot {
 
 			}
 
-		}
 	}
 
 	public void onWin(WinEvent e) {
@@ -225,8 +227,7 @@ public class NickStumpos extends AdvancedRobot {
 	}
 
 	private double threatLevel(Enemy e) {
-		//return e.e.getEnergy() / e.location.distanceSq(me);
-		return e.location.distance(me);
+		return e.e.getEnergy() / e.location.distanceSq(me);
 	}
 
 	public void onRobotDeath(RobotDeathEvent e) {
